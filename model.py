@@ -16,7 +16,7 @@ class Vocabulary:
   def convert(self, word):
     if word not in self.w2i:
       if self.frozen:
-        assert False, ('Invalid attempt to convert unknown word "%s" on a'
+        assert False, ('Invalid attempt to convert unknown word "%s" on a '
                         'frozen vocabulary.' % (word))
       self.w2i[word] = len(self.i2w)
       self.i2w.append(word)
