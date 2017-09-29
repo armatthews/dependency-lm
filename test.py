@@ -10,9 +10,9 @@ import dynet_config
 dynet_config.set(mem=4096)
 import dynet as dy
 
-from model import RNNLM
-from model import Vocabulary
-from model import read_corpus
+from train import RNNLM
+from utils import Vocabulary
+from utils import read_corpus
 
 
 def run_test_set(rnnlm, corpus, args):

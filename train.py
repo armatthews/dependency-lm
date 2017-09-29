@@ -7,42 +7,81 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=4096)
+dynet_config.set(mem=4096, weight_decay=0.0)
 dynet_config.set_gpu()
 import dynet as dy
 
-from model import RNNLM
-from model import Vocabulary
-from model import read_corpus
+from utils import Vocabulary
+from utils import read_corpus
+from utils import MLP
+from harness import train
 
 
-def run_dev_set(rnnlm, corpus, args):
-  total_loss = 0.0
-  word_count = 0
-  losses = []
-  rnnlm.set_dropout(0.0)
-  for sent in corpus:
-    if len(losses) == 0:
-      dy.renew_cg(autobatching = args.autobatch)
-      rnnlm.new_graph()
-    loss = rnnlm.build_graph(sent)
-    losses.append(loss)
-    word_count += len(sent)
+class RNNLM:
+  def __init__(self, pc, layers, emb_dim, hidden_dim, vocab_size):
+    self.spec = (layers, emb_dim, hidden_dim, vocab_size)
+    self.pc = pc.add_subcollection()
+    self.rnn = dy.LSTMBuilder(layers, emb_dim, hidden_dim, self.pc)
+    self.initial_state_params = [self.pc.add_parameters((hidden_dim,)) for _ in range(2 * layers)]
+    self.word_embs = self.pc.add_lookup_parameters((vocab_size, emb_dim))
+    self.output_mlp = MLP(self.pc, [hidden_dim, hidden_dim, vocab_size])
 
-    if len(losses) == args.minibatch_size:
-      total_loss += dy.esum(losses).scalar_value()
-      losses = []
+  def new_graph(self):
+    self.output_mlp.new_graph()
+    self.initial_state = [dy.parameter(p) for p in self.initial_state_params]
+    #self.exp = dy.scalarInput(-0.5)
 
-  if len(losses) > 0:
-    total_loss += dy.esum(losses).scalar_value()
+  def set_dropout(self, r):
+    self.output_mlp.set_dropout(r)
+    self.rnn.set_dropout(r)
+
+  def build_graph(self, sent):
+    state = self.rnn.initial_state()
+    state = state.set_s(self.initial_state)
+
     losses = []
+    for word in sent:
+      assert state != None
+      so = state.output()
+      assert so != None
+      output_dist = self.output_mlp(so)
+      loss = dy.pickneglogsoftmax(output_dist, word)
+      losses.append(loss)
+      word_emb = dy.lookup(self.word_embs, word)
+      #word_emb_norm = dy.pow(dy.dot_product(word_emb, word_emb), self.exp)
+      #word_emb = word_emb * word_emb_norm
+      state = state.add_input(word_emb)
+    return dy.esum(losses)
 
-  print('Dev loss: %f total, %f per sent (%d), %f per word (%d)' % (
-      total_loss,
-      total_loss / len(corpus), len(corpus),
-      total_loss / word_count, word_count))
-  sys.stdout.flush()
-  return total_loss
+  def sample(self, eos, max_len):
+    #dy.renew_cg()
+    #self.new_graph()
+    state = self.rnn.initial_state()
+    state = state.set_s(self.initial_state)
+    sent = []
+    while len(sent) < max_len:
+      assert state != None
+      so = state.output()
+      assert so != None
+      output_dist = dy.softmax(self.output_mlp(so))
+      output_dist = output_dist.vec_value()
+      word = sample(output_dist)
+      sent.append(word)
+      if word == eos:
+        break
+      word_emb = dy.lookup(self.word_embs, word)
+      #word_emb_norm = dy.pow(dy.dot_product(word_emb, word_emb), self.exp)
+      #word_emb = word_emb * word_emb_norm
+      state = state.add_input(word_emb)
+    return sent
+
+  def param_collection(self):
+    return self.pc
+
+  @staticmethod
+  def from_spec(spec, pc):
+    rnnlm = RNNLM(pc, *spec)
+    return rnnlm
 
 
 def sample_sentence(rnnlm, vocab):
@@ -71,7 +110,7 @@ def main():
   print('Output file:', args.output, file=sys.stderr)
 
   vocab = Vocabulary()
-  corpus = read_corpus(args.corpus, vocab)
+  train_corpus = read_corpus(args.corpus, vocab)
   dev_corpus = read_corpus(args.dev_corpus, vocab)
   print('Vocab size:', len(vocab), file=sys.stderr)
 
@@ -80,58 +119,11 @@ def main():
       print(word, file=f)
 
   pc = dy.ParameterCollection()
-  optimizer = dy.SimpleSGDTrainer(pc)
-  rnnlm = RNNLM(pc, args.layers, args.emb_dim, args.hidden_dim, len(vocab))
-  print('Total parameters:', pc.parameter_count())
+  optimizer = dy.SimpleSGDTrainer(pc, 1.0)
+  model = RNNLM(pc, args.layers, args.emb_dim, args.hidden_dim, len(vocab))
+  print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
-  losses = []
-  word_count = 0
-  updates_done = 0
-  best_dev_score = None
-  learning_rate_changes = 0
-
-  while True:
-    random.shuffle(corpus)
-    for sent in corpus:
-      if len(losses) == 0:
-        dy.renew_cg(autobatching=args.autobatch)
-        rnnlm.new_graph()
-
-      rnnlm.set_dropout(args.dropout)
-      loss = rnnlm.build_graph(sent)
-      word_count += len(sent)
-      losses.append(loss)
-
-      if len(losses) == args.minibatch_size:
-        total_loss = dy.esum(losses)
-        total_loss.forward()
-        per_word = total_loss.scalar_value() / word_count
-        per_sent = total_loss.scalar_value() / len(losses)
-        print(per_word, per_sent)
-        sys.stdout.flush()
-        total_loss.backward()
-        optimizer.update()
-        losses = []
-        word_count = 0
-        updates_done += 1
-
-        if updates_done % 50 == 0:
-          print(sample_sentence(rnnlm, vocab))
-          sys.stdout.flush()
-
-        if updates_done % 150 == 0:
-          dev_score = run_dev_set(rnnlm, dev_corpus, args)
-          if best_dev_score == None or dev_score < best_dev_score:
-            best_dev_score = dev_score
-            pc.save(args.output)
-            print('Model saved!')
-            sys.stdout.flush()
-          else:
-            f = (learning_rate_changes + 1) / (learning_rate_changes + 2)
-            optimizer.learning_rate *= f
-            learning_rate_changes += 1
-
-    print('=== END EPOCH ===')
+  train(model, train_corpus, dev_corpus, optimizer, args)
 
 if __name__ == '__main__':
   main()
