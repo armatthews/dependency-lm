@@ -19,14 +19,16 @@ ParserState = collections.namedtuple(
     'ParserState', 'parent, stack_state, comp_state, left_done')
 
 class TopDownDepLM:
-  def __init__(self, pc, vocab, layers, state_dim, final_hidden_dim):
+  def __init__(self, pc, vocab, layers, state_dim, final_hidden_dim, tied):
     self.vocab = vocab
+    self.tied = tied
     self.done_with_left = vocab.convert('</LEFT>')
     self.done_with_right = vocab.convert('</RIGHT>')
     vocab_size = len(self.vocab)
 
     self.pc = pc.add_subcollection()
-    self.word_embs = self.pc.add_lookup_parameters((vocab_size, state_dim))
+    if not self.tied:
+      self.word_embs = self.pc.add_lookup_parameters((vocab_size, state_dim))
 
     self.stack_lstm = dy.LSTMBuilder(layers, state_dim, state_dim, self.pc)
     self.comp_lstm = dy.LSTMBuilder(layers, state_dim, state_dim, self.pc)
@@ -49,8 +51,17 @@ class TopDownDepLM:
     self.comp_initial_state = [
         dy.parameter(p) for p in self.comp_initial_state_params]
 
+  def embed_word(self, word):
+    if self.tied:
+      word_embs = self.final_mlp.layers[-1].w
+      word_emb = dy.select_rows(word_embs, [word])
+      word_emb = dy.transpose(word_emb)
+    else:
+      word_emb = dy.lookup(self.word_embs, word)
+    return word_emb
+
   def add_input(self, state, word):
-    word_emb = dy.lookup(self.word_embs, word)
+    word_emb = self.embed_word(word)
     if word == self.done_with_left:
       assert not state.left_done
       stack_state = state.stack_state
@@ -126,6 +137,7 @@ def main():
   parser.add_argument('--hidden_dim', type=int, default=128)
   parser.add_argument('--minibatch_size', type=int, default=1)
   parser.add_argument('--autobatch', action='store_true')
+  parser.add_argument('--tied', action='store_true')
   parser.add_argument('--dropout', type=float, default=0.0)
   parser.add_argument('--output', type=str, default='')
   args = parser.parse_args()
@@ -143,7 +155,7 @@ def main():
 
   pc = dy.ParameterCollection()
   optimizer = dy.SimpleSGDTrainer(pc, 1.0)
-  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim)
+  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim, args.tied)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
   train(model, train_corpus, dev_corpus, optimizer, args)

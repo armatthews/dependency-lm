@@ -4,7 +4,7 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=8*1024)
+#dynet_config.set(mem=8*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
@@ -15,13 +15,15 @@ from utils import MLP
 from harness import train
 
 class BottomUpDepLM:
-  def __init__(self, pc, action_vocab, word_vocab_size, rel_vocab_size, layers, hidden_dim, labelled=True):
+  def __init__(self, pc, action_vocab, word_vocab_size, rel_vocab_size, layers, hidden_dim, labelled=True, tied=False):
     self.labelled = labelled
+    self.tied = tied
     self.action_vocab = action_vocab
     self.pc = pc.add_subcollection()
     action_vocab_size = len(action_vocab)
 
-    self.word_embs = self.pc.add_lookup_parameters((word_vocab_size, hidden_dim))
+    if not self.tied:
+      self.word_embs = self.pc.add_lookup_parameters((word_vocab_size, hidden_dim))
     self.action_mlp = MLP(self.pc, [hidden_dim, hidden_dim, action_vocab_size])
     self.word_mlp = MLP(self.pc, [hidden_dim, hidden_dim, word_vocab_size])
 
@@ -62,6 +64,15 @@ class BottomUpDepLM:
     head_and_child = dy.concatenate([head, child])
     return self.combine_mlp(head_and_child)
 
+  def embed_word(self, word):
+    if self.tied:
+      word_embs = self.word_mlp.layers[-1].w
+      word_emb = dy.select_rows(word_embs, [word])
+      word_emb = dy.transpose(word_emb)
+    else:
+      word_emb = dy.lookup(self.word_embs, word)
+    return word_emb
+
   def embed_stack_naive(self):
     state = self.stack_lstm.initial_state()
     state = state.set_s(self.initial_state)
@@ -83,7 +94,7 @@ class BottomUpDepLM:
     self.stack_embs.append(state)
 
   def shift(self, word):
-    word_emb = dy.lookup(self.word_embs, word)
+    word_emb = self.embed_word(word)
     self.push(word_emb)
 
   def reduce_right(self):
@@ -171,6 +182,7 @@ def main():
   parser.add_argument('--hidden_dim', type=int, default=128)
   parser.add_argument('--minibatch_size', type=int, default=1)
   parser.add_argument('--autobatch', action='store_true')
+  parser.add_argument('--tied', action='store_true')
   parser.add_argument('--dropout', type=float, default=0.0)
   parser.add_argument('--output', type=str, default='')
   args = parser.parse_args()
@@ -196,7 +208,8 @@ def main():
 
   pc = dy.ParameterCollection()
   optimizer = dy.SimpleSGDTrainer(pc, 1.0)
-  model = BottomUpDepLM(pc, action_vocab, len(terminal_vocab), len(rel_vocab), args.layers, args.hidden_dim, False)
+  model = BottomUpDepLM(pc, action_vocab, len(terminal_vocab), len(rel_vocab),
+                        args.layers, args.hidden_dim, False, args.tied)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
   train(model, train_corpus, dev_corpus, optimizer, args)
