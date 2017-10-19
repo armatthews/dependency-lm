@@ -41,8 +41,8 @@ def run_dev_set(model, corpus, args):
   print('Dev loss: %f total, %f per sent (%d), %f per word (%d)' % (
       total_loss,
       total_loss / len(corpus), len(corpus),
-      total_loss / word_count, word_count))
-  sys.stdout.flush()
+      total_loss / word_count, word_count),
+      file=sys.stderr)
   return total_loss
 
 
@@ -70,8 +70,7 @@ def train(model, train_corpus, dev_corpus, optimizer, args):
         total_loss.forward()
         per_word = total_loss.scalar_value() / word_count
         per_sent = total_loss.scalar_value() / len(losses)
-        print(per_word, per_sent)
-        sys.stdout.flush()
+        print(per_word, per_sent, file=sys.stderr)
         total_loss.backward()
         optimizer.update()
         losses = []
@@ -84,7 +83,6 @@ def train(model, train_corpus, dev_corpus, optimizer, args):
             best_dev_score = dev_score
             model.pc.save(args.output)
             print('Model saved!', file=sys.stderr)
-            sys.stdout.flush()
           else:
             f = (learning_rate_changes + 1) / (learning_rate_changes + 2)
             optimizer.learning_rate *= f

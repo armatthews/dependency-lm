@@ -112,3 +112,40 @@ def sample(dist):
 
   print('WARNING: sample random was 1.0', file=sys.stderr)
   return len(dist) - 1
+
+def run_test_set(model, corpus, args):
+  total_loss = 0.0
+  word_count = 0
+  sent_lens = []
+  losses = []
+  def dump(losses, sent_lens):
+    total_loss = 0.0
+    if args.sent_level:
+      scalar_losses = [loss.scalar_value() for loss in losses]
+      for i in range(len(losses)):
+        si = sent_num - len(losses) + 1 + i
+        print(si, scalar_losses[i], scalar_losses[i] / sent_lens[i])
+      total_loss += sum(scalar_losses)
+    else:
+      total_loss += dy.esum(losses).scalar_value()
+    del losses[:]
+    del sent_lens[:]
+    return total_loss
+
+  for sent_num, sent in enumerate(corpus):
+    if len(losses) == 0:
+      dy.renew_cg(autobatching = args.autobatch)
+      model.new_graph()
+    loss = model.build_graph(sent)
+    losses.append(loss)
+    sent_lens.append(len(sent))
+    word_count += len(sent)
+
+    if len(losses) == args.minibatch_size:
+      total_loss += dump(losses, sent_lens)
+  if len(losses) > 0:
+    total_loss += dump(losses, sent_lens)
+
+  print('Loss: %f total, %f per sent, %f per word' % (total_loss, total_loss / len(corpus), total_loss / word_count))
+  sys.stdout.flush()
+
