@@ -7,7 +7,8 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=4096)
+dynet_config.set(mem=8*1024)
+dynet_config.set_gpu()
 import dynet as dy
 
 sys.path.append('..')

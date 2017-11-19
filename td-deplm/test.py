@@ -4,14 +4,14 @@ import random
 import sys
 
 import dynet_config
-#dynet_config.set(mem=11*1024)
+dynet_config.set(mem=8*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
 sys.path.append('..')
 from utils import Vocabulary
-from td_deplm import TopDownDepLM
-from td_deplm import read_corpus
+from train import TopDownDepLM
+from train import read_corpus
 from utils import run_test_set
 
 
@@ -25,6 +25,7 @@ def main():
   parser.add_argument('--hidden_dim', type=int, default=128)
   parser.add_argument('--minibatch_size', type=int, default=1)
   parser.add_argument('--autobatch', action='store_true')
+  parser.add_argument('--tied', action='store_true')
   parser.add_argument('--sent_level', action='store_true')
   args = parser.parse_args()
 
@@ -36,7 +37,7 @@ def main():
   print('Vocabulary size:', len(vocab), file=sys.stderr)
 
   pc = dy.ParameterCollection()
-  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim)
+  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim, args.tied)
   pc.populate_from_textfile(args.model)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 

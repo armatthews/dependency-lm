@@ -10,8 +10,8 @@ import dynet as dy
 
 sys.path.append('..')
 from utils import Vocabulary
-from deplm import BottomUpDepLM
-from deplm import read_corpus
+from train import BottomUpDepLM
+from train import read_corpus
 from utils import run_test_set
 
 
@@ -25,6 +25,7 @@ def main():
   parser.add_argument('--hidden_dim', type=int, default=128)
   parser.add_argument('--minibatch_size', type=int, default=1)
   parser.add_argument('--autobatch', action='store_true')
+  parser.add_argument('--tied', action='store_true')
   parser.add_argument('--sent_level', action='store_true')
   args = parser.parse_args()
 
@@ -44,7 +45,8 @@ def main():
         file=sys.stderr)
 
   pc = dy.ParameterCollection()
-  model = BottomUpDepLM(pc, action_vocab, len(terminal_vocab), len(rel_vocab), args.layers, args.hidden_dim, False)
+  model = BottomUpDepLM(pc, action_vocab, len(terminal_vocab), len(rel_vocab),
+                        args.layers, args.hidden_dim, False, args.tied)
   pc.populate_from_textfile(args.model)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 

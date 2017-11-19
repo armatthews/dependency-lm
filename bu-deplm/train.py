@@ -4,15 +4,14 @@ import random
 import sys
 
 import dynet_config
-#dynet_config.set(mem=8*1024)
+dynet_config.set(mem=8*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
 sys.path.append('..')
 from utils import Vocabulary
 from utils import MLP
-
-from harness import train
+import harness
 
 class BottomUpDepLM:
   def __init__(self, pc, action_vocab, word_vocab_size, rel_vocab_size, layers, hidden_dim, labelled=True, tied=False):
@@ -185,6 +184,7 @@ def main():
   parser.add_argument('--tied', action='store_true')
   parser.add_argument('--dropout', type=float, default=0.0)
   parser.add_argument('--output', type=str, default='')
+  harness.add_optimizer_args(parser)
   args = parser.parse_args()
 
   if args.output == '':
@@ -207,12 +207,12 @@ def main():
         file=sys.stderr)
 
   pc = dy.ParameterCollection()
-  optimizer = dy.SimpleSGDTrainer(pc, 1.0)
+  optimizer = harness.make_optimizer(args, pc)
   model = BottomUpDepLM(pc, action_vocab, len(terminal_vocab), len(rel_vocab),
                         args.layers, args.hidden_dim, False, args.tied)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
-  train(model, train_corpus, dev_corpus, optimizer, args)
+  harness.train(model, train_corpus, dev_corpus, optimizer, args)
 
 if __name__ == '__main__':
   main()

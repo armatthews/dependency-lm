@@ -11,6 +11,14 @@ dynet_config.set(mem=4096)
 dynet_config.set_gpu()
 import dynet as dy
 
+def add_optimizer_args(parser):
+  parser.add_argument('--adam', action='store_true')
+
+def make_optimizer(args, pc):
+  if args.adam:
+    return dy.AdamTrainer(pc, 2.e-4)
+  return dy.SimpleSGDTrainer(pc, 1.0)
+
 
 def run_dev_set(model, corpus, args):
   if len(corpus) == 0:
@@ -52,6 +60,7 @@ def train(model, train_corpus, dev_corpus, optimizer, args):
   updates_done = 0
   best_dev_score = None
   learning_rate_changes = 0
+  bad_devs_in_row = 0
 
   while True:
     random.shuffle(train_corpus)
@@ -80,12 +89,17 @@ def train(model, train_corpus, dev_corpus, optimizer, args):
         if updates_done % 150 == 0:
           dev_score = run_dev_set(model, dev_corpus, args)
           if best_dev_score == None or dev_score < best_dev_score:
+            bad_devs_in_row = 0
             best_dev_score = dev_score
             model.pc.save(args.output)
             print('Model saved!', file=sys.stderr)
           else:
-            f = (learning_rate_changes + 1) / (learning_rate_changes + 2)
-            optimizer.learning_rate *= f
-            learning_rate_changes += 1
+            pass
+            #bad_devs_in_row += 1
+            #if bad_devs_in_row >= 3:
+            #  f = (learning_rate_changes + 1) / (learning_rate_changes + 2)
+            #  optimizer.learning_rate *= f
+            #  learning_rate_changes += 1
+            #  bad_devs_in_row = 0
 
     print('=== END EPOCH ===')

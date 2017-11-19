@@ -5,15 +5,14 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=6*1024)
+dynet_config.set(mem=10*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
 sys.path.append('../')
 from utils import Vocabulary
 from utils import MLP
-
-from harness import train
+import harness
 
 ParserState = collections.namedtuple(
     'ParserState', 'parent, stack_state, comp_state, left_done')
@@ -140,6 +139,7 @@ def main():
   parser.add_argument('--tied', action='store_true')
   parser.add_argument('--dropout', type=float, default=0.0)
   parser.add_argument('--output', type=str, default='')
+  harness.add_optimizer_args(parser)
   args = parser.parse_args()
 
   if args.output == '':
@@ -154,11 +154,11 @@ def main():
   print('Vocabulary size:', len(vocab), file=sys.stderr)
 
   pc = dy.ParameterCollection()
-  optimizer = dy.SimpleSGDTrainer(pc, 1.0)
+  optimizer = harness.make_optimizer(args, pc)
   model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim, args.tied)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
-  train(model, train_corpus, dev_corpus, optimizer, args)
+  harness.train(model, train_corpus, dev_corpus, optimizer, args)
 
 if __name__ == '__main__':
   main()

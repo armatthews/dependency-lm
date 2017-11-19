@@ -15,7 +15,7 @@ sys.path.append('..')
 from utils import Vocabulary
 from utils import read_corpus
 from utils import MLP
-from harness import train
+import harness
 
 class RNNLM:
   def __init__(self, pc, layers, emb_dim, hidden_dim, vocab_size, tied):
@@ -116,10 +116,11 @@ def main():
   parser.add_argument('--emb_dim', type=int, default=128)
   parser.add_argument('--hidden_dim', type=int, default=128)
   parser.add_argument('--minibatch_size', type=int, default=1)
-  parser.add_argument('--autobatch', action='store_true')
   parser.add_argument('--tied', action='store_true')
+  parser.add_argument('--autobatch', action='store_true')
   parser.add_argument('--dropout', type=float, default=0.0)
   parser.add_argument('--output', type=str, default='')
+  harness.add_optimizer_args(parser)
   args = parser.parse_args()
 
   if args.output == '':
@@ -136,11 +137,11 @@ def main():
       print(word, file=f)
 
   pc = dy.ParameterCollection()
-  optimizer = dy.SimpleSGDTrainer(pc, 1.0)
+  optimizer = harness.make_optimizer(args, pc)
   model = RNNLM(pc, args.layers, args.emb_dim, args.hidden_dim, len(vocab), args.tied)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
-  train(model, train_corpus, dev_corpus, optimizer, args)
+  harness.train(model, train_corpus, dev_corpus, optimizer, args)
 
 if __name__ == '__main__':
   main()
