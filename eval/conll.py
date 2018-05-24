@@ -1,6 +1,14 @@
 from collections import namedtuple
 Parse = namedtuple('Parse', 'words, tags, heads, rels')
 
+def parse_to_string(parse):
+  output = []
+  for i, (word, tag, head, rel) in enumerate(zip(parse.words, parse.tags, parse.heads, parse.rels)):
+    parts = [str(i + 1), word, '_', tag, tag, '_', str(head + 1), rel, '_', '_']
+    output.append('\t'.join(parts))
+  output.append('')
+  return '\n'.join(output)
+
 def parse(lines):
   words = []
   tags = []
@@ -9,7 +17,10 @@ def parse(lines):
 
   for line in lines:
     parts = line.split('\t')
-    id = int(parts[0]) - 1 # subtract one so we index from 0
+    id = parts[0]
+    if '-' in id or '.' in id:
+      continue
+    id = int(id) - 1 # subtract one so we index from 0
     word = parts[1]
     tag = parts[3]
     head = int(parts[6]) - 1

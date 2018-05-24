@@ -125,6 +125,7 @@ def run_test_set(model, corpus, args):
       for i in range(len(losses)):
         si = sent_num - len(losses) + 1 + i
         print(si, scalar_losses[i], scalar_losses[i] / sent_lens[i])
+        sys.stdout.flush()
       total_loss += sum(scalar_losses)
     else:
       total_loss += dy.esum(losses).scalar_value()

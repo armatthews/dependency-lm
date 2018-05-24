@@ -4,10 +4,11 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=8*1024)
+dynet_config.set(mem=10*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
+sys.path.append('/home/austinma/git/rnnlm/')
 sys.path.append('..')
 from utils import Vocabulary
 from utils import MLP
@@ -114,6 +115,8 @@ class BottomUpDepLM:
     combined = self.combine(head, child, 'left')
     self.push(combined)
 
+  warned = False
+
   def build_graph(self, sent):
     losses = []
     self.new_sent()
@@ -127,9 +130,12 @@ class BottomUpDepLM:
 
       loss = action_nlp
       if action_str == 'shift':
-        word_logits = self.word_mlp(hidden_state)
-        word_nlp = dy.pickneglogsoftmax(word_logits, subtype)
-        loss += word_nlp
+        if not self.warned:
+          sys.stderr.write('WARNING: Hacked to not include terminal losses')
+          self.warned = True
+        #word_logits = self.word_mlp(hidden_state)
+        #word_nlp = dy.pickneglogsoftmax(word_logits, subtype)
+        #loss += word_nlp
       elif self.labelled:
         rel_logits = self.rel_mlp(hidden_state)
         rel_nlp = dy.pickneglogsoftmax(rel_logits, subtype)

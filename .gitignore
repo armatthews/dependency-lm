@@ -1,0 +1,6 @@
+*.txt
+*.out
+*.err
+*.pyc
+*.model
+*.vocab

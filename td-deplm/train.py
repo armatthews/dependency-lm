@@ -9,6 +9,7 @@ dynet_config.set(mem=10*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
+sys.path.append('/home/austinma/git/rnnlm/')
 sys.path.append('../')
 from utils import Vocabulary
 from utils import MLP
@@ -99,12 +100,25 @@ class TopDownDepLM:
     comp_state = comp_state.set_s(self.comp_initial_state)
     return ParserState(None, stack_state, comp_state, True)
 
+  warned = False
   def compute_loss(self, state, word):
     stack_output = state.stack_state.output()
     comp_output = state.comp_state.output()
     final_input = dy.concatenate([stack_output, comp_output])
     logits = self.final_mlp(final_input)
-    loss = dy.pickneglogsoftmax(logits, word)
+    #loss = dy.pickneglogsoftmax(logits, word)
+
+    if not self.warned:
+      sys.stderr.write('WARNING: compute_loss hacked to not include actual terminals.\n')
+      self.warned = True
+    if word != 0 and word != 1:
+      probs = -dy.softmax(logits)
+      left_prob = dy.pick(probs, 0)
+      right_prob = dy.pick(probs, 1)
+      loss = dy.log(1 - left_prob - right_prob)
+    else:
+      loss = dy.pickneglogsoftmax(logits, word)
+    
     return loss
 
   def build_graph(self, sent):

@@ -7,10 +7,11 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=6*1024)
+dynet_config.set(mem=8*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
+sys.path.append('/home/austinma/git/rnnlm/')
 sys.path.append('..')
 from utils import Vocabulary
 from utils import read_corpus

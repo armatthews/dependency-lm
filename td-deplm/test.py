@@ -4,10 +4,11 @@ import random
 import sys
 
 import dynet_config
-dynet_config.set(mem=8*1024)
-dynet_config.set_gpu()
+#dynet_config.set(mem=10*1024)
+#dynet_config.set_gpu()
 import dynet as dy
 
+sys.path.append('/home/austinma/git/rnnlm/')
 sys.path.append('..')
 from utils import Vocabulary
 from train import TopDownDepLM

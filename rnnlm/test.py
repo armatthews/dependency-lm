@@ -11,6 +11,7 @@ dynet_config.set(mem=8*1024)
 dynet_config.set_gpu()
 import dynet as dy
 
+sys.path.append('/home/austinma/git/rnnlm/')
 sys.path.append('..')
 from train import RNNLM
 from utils import Vocabulary
