@@ -4,8 +4,8 @@ import random
 import sys
 
 import dynet_config
-#dynet_config.set(mem=10*1024)
-#dynet_config.set_gpu()
+dynet_config.set(mem="8096,1,512,512")
+dynet_config.set_gpu()
 import dynet as dy
 
 sys.path.append('/home/austinma/git/rnnlm/')
@@ -27,6 +27,7 @@ def main():
   parser.add_argument('--minibatch_size', type=int, default=1)
   parser.add_argument('--autobatch', action='store_true')
   parser.add_argument('--tied', action='store_true')
+  parser.add_argument('--residual', action='store_true')
   parser.add_argument('--sent_level', action='store_true')
   args = parser.parse_args()
 
@@ -38,7 +39,7 @@ def main():
   print('Vocabulary size:', len(vocab), file=sys.stderr)
 
   pc = dy.ParameterCollection()
-  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim, args.tied)
+  model = TopDownDepLM(pc, vocab, args.layers, args.hidden_dim, args.hidden_dim, args.tied, args.residual)
   pc.populate_from_textfile(args.model)
   print('Total parameters:', pc.parameter_count(), file=sys.stderr)
 
