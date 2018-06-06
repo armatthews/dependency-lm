@@ -44,7 +44,8 @@ class LinearLayer:
 
   def __call__(self, x):
     assert x != None
-    return self.w * x + self.b
+    return dy.affine_transform([self.b, self.w, x])
+    #return self.w * x + self.b
 
   def param_collection(self):
     return self.pc

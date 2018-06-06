@@ -81,10 +81,11 @@ def train(model, train_corpus, dev_corpus, optimizer, args):
         per_sent = total_loss.scalar_value() / len(losses)
         print(per_word, per_sent, file=sys.stderr)
         total_loss.backward()
-        optimizer.update()
+        if len(losses) == args.minibatch_size or True:
+          optimizer.update()
+          updates_done += 1
         losses = []
         word_count = 0
-        updates_done += 1
 
         if updates_done % 150 == 0:
           dev_score = run_dev_set(model, dev_corpus, args)
